@@ -8,7 +8,6 @@ import com.squareup.javapoet.MethodSpec
 import com.squareup.javapoet.ParameterSpec
 import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
-import com.squareup.javapoet.TypeSpec.Builder
 import net.lab0.foiegras.CompilationFailed
 import net.lab0.foiegras.JavaBenchmarking
 import net.lab0.foiegras.caze.iface.BenchmarkCase
@@ -21,9 +20,9 @@ import javax.lang.model.element.Modifier.PRIVATE
 import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 
-class NewObjectAsField(
+class NewClassAsField(
     val outputFolder: Path,
-    override val upperBoundHint: Int = 1000
+    override val upperBoundHint: Int = 10000
 ) : BenchmarkCase {
 
   var fieldsCount: Int = -1
@@ -32,13 +31,13 @@ class NewObjectAsField(
     get() = listOf(
         "base",
         "j",
-        "initobjects",
+        "initclasses",
         this::class.simpleName?.toLowerCase(),
         "f$fieldsCount"
     ).joinToString(".")
 
   val className
-    get() = "CInitObjects${fieldsCount}Fields"
+    get() = "CInitClasses${fieldsCount}Fields"
 
   override fun evaluateAt(fieldsCount: Int): Boolean {
     this.fieldsCount = fieldsCount
@@ -66,34 +65,53 @@ class NewObjectAsField(
     val dataImplFields = createAllFields()
     val dataIface = createDataInterface(dataImplFields)
     val dataImpl = createDataImpl(dataImplFields)
+    val dataClasses = createDataClasses(dataImplFields)
     val dataList = buildDataList()
 
     return listOf(
-        JavaFile.builder(packageName, dataIface.build()).build(),
-        JavaFile.builder(packageName, dataImpl.build()).build(),
-        JavaFile.builder(packageName, dataList.build()).build()
-    )
+        JavaFile.builder(packageName, dataIface).build(),
+        JavaFile.builder(packageName, dataImpl).build(),
+        JavaFile.builder(packageName, dataList).build()
+    ) + dataClasses.map {
+      JavaFile.builder(packageName, it).build()
+    }
   }
 
-  private fun buildDataList(): Builder {
+  private fun createDataClasses(dataImplFields: List<DataImplField>): List<TypeSpec> {
+    val superBlock = CodeBlock.of(
+        "\$L\n",
+        """
+          | super(
+          | "Hello",
+          | null,
+          | Integer.MIN_VALUE,
+          | Integer.MAX_VALUE,
+          | new Float[] {0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f}
+          | );
+        """.trimMargin()
+    )
+
+    return (1..fieldsCount).map {
+      TypeSpec
+          .classBuilder("DataClass$it")
+          .superclass(
+              ClassName.bestGuess("$packageName.DataImpl")
+          ).addMethod(
+              MethodSpec
+                  .constructorBuilder()
+                  .addCode(superBlock)
+                  .build()
+          )
+          .build()
+    }
+  }
+
+  private fun buildDataList(): TypeSpec {
     val dataList = TypeSpec.classBuilder(
         ClassName.get(
             packageName,
             className
         )
-    )
-
-    val initBlock = CodeBlock.of(
-        "\$L",
-        """
-                    | new DataImpl(
-                    |   "Hello",
-                    |   null,
-                    |   Integer.MIN_VALUE,
-                    |   Integer.MAX_VALUE,
-                    |   new Float[] {0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f}
-                    | )
-                  """.trimMargin()
     )
 
     dataList.addFields(
@@ -103,17 +121,20 @@ class NewObjectAsField(
               "data$it",
               PUBLIC, STATIC
           ).initializer(
-              initBlock
+              CodeBlock.of(
+                  "new \$T()",
+                  ClassName.bestGuess("$packageName.DataClass$it")
+              )
           ).build()
         }
     )
 
-    return dataList
+    return dataList.build()
   }
 
   private fun createDataImpl(
       dataImplFields: List<DataImplField>
-  ): TypeSpec.Builder {
+  ): TypeSpec {
     val dataImpl = TypeSpec.classBuilder(
         ClassName.get(
             packageName,
@@ -162,12 +183,12 @@ class NewObjectAsField(
             .build()
     )
 
-    return dataImpl
+    return dataImpl.build()
   }
 
   private fun createDataInterface(
       dataImplFields: List<DataImplField>
-  ): TypeSpec.Builder {
+  ): TypeSpec {
     val dataIface = TypeSpec.interfaceBuilder(
         ClassName.get(packageName, "Data")
     )
@@ -184,7 +205,8 @@ class NewObjectAsField(
               ).build()
         }
     )
-    return dataIface
+
+    return dataIface.build()
   }
 
   private fun createAllFields(): List<DataImplField> {

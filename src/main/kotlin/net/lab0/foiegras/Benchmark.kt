@@ -2,7 +2,7 @@ package net.lab0.foiegras
 
 import net.lab0.foiegras.caze.BenchmarkResultImpl
 import net.lab0.foiegras.caze.JavaFlatCaseImpl
-import net.lab0.foiegras.caze.NewObjectAsField
+import net.lab0.foiegras.caze.NewClassAsField
 import net.lab0.foiegras.caze.iface.BenchmarkCase
 import net.lab0.foiegras.caze.iface.BenchmarkResult
 import java.nio.file.Path
@@ -26,7 +26,7 @@ val log: Logger by lazy {
   }
 
   val l = Logger.getLogger(Logger::class.java.name)
-  l.level = Level.FINEST
+  l.level = Level.FINE
 
   val h = ConsoleHandler()
   h.level = Level.ALL
@@ -54,7 +54,8 @@ fun main(args: Array<String>) {
 
 fun generateComplexCases(outputFolder: Path): List<BenchmarkCase> {
   return listOf(
-      NewObjectAsField(outputFolder)
+//      NewObjectAsField(outputFolder),
+      NewClassAsField(outputFolder)
   )
 }
 
@@ -71,6 +72,7 @@ fun evaluateCases(cases:List<BenchmarkCase>) {
 
     val sweet = sweetspot(
         accuracy = 1,
+        high = Math.min(case.upperBoundHint, 65536),
         test = { case.evaluateAt(it) }
     )
 
@@ -133,7 +135,7 @@ fun sweetspot(
 ): Int {
   val middle = (low + high) / 2
 
-  log.fine("Sweet spot iteration $iteration")
+  log.fine("Sweet spot iteration $iteration: $middle")
 
   return if (high - low <= accuracy) middle
   else {

@@ -15,7 +15,8 @@ import javax.lang.model.element.Modifier
 class JavaFlatCaseImpl(
     override val outputFolder: Path,
     override val keywords: List<Modifier>,
-    override val init: Boolean
+    override val init: Boolean,
+    override val upperBoundHint: Int = 65536
 ) : JavaFlatCase {
 
   var fieldsCount: Int = -1
