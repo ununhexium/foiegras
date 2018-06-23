@@ -12,6 +12,4 @@ interface BenchmarkCase {
    * Explicitly tell what has been tested.
    */
   fun verboseString(): String
-
-  val upperBoundHint: Int
 }

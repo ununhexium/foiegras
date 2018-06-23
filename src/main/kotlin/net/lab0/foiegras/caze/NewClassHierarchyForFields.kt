@@ -1,5 +1,6 @@
 package net.lab0.foiegras.caze
 
+import com.google.common.collect.Lists
 import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.FieldSpec
@@ -8,6 +9,7 @@ import com.squareup.javapoet.MethodSpec
 import com.squareup.javapoet.ParameterSpec
 import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
+import com.squareup.javapoet.TypeSpec.Builder
 import net.lab0.foiegras.CompilationFailed
 import net.lab0.foiegras.JavaBenchmarking
 import net.lab0.foiegras.caze.iface.BenchmarkCase
@@ -21,30 +23,31 @@ import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 import javax.lang.model.element.Modifier.SYNCHRONIZED
 
-class NewClassAsField(
-    val outputFolder: Path,
-    val useStatic: Boolean
+class NewClassHierarchyForFields(
+    val outputFolder: Path
 ) : BenchmarkCase {
 
   var fieldsCount: Int = -1
+
+  /**
+   * Magoic number taken from my previous tests.
+   * These were showing that the maximum is around 6500 fields for a single class.
+   * This leaves some margin so there is no need to change that number
+   * (until the next crazy code generation...)
+   */
+  val PARTITION_SIZE = 5000
 
   val packageName
     get() = listOf(
         "base",
         "j",
-        "initclasses",
-        if (useStatic) {
-          "statiq"
-        }
-        else {
-          "instance"
-        },
+        "hiera",
         this::class.simpleName?.toLowerCase(),
         "f$fieldsCount"
     ).joinToString(".")
 
   val className
-    get() = "CInitClasses${fieldsCount}Fields"
+    get() = "CHiera${fieldsCount}Fields"
 
   override fun evaluateAt(fieldsCount: Int): Boolean {
     this.fieldsCount = fieldsCount
@@ -69,19 +72,63 @@ class NewClassAsField(
   }
 
   private fun generateJavaClasses(): List<JavaFile> {
+
+    val dataClassesPackage = "$packageName.data"
+    val dataPartPackage = "$packageName.part"
     val dataImplFields = createAllFields()
     val dataIface = createDataInterface(dataImplFields)
     val dataImpl = createDataImpl(dataImplFields)
     val dataClasses = createDataClasses()
-    val dataList = buildDataList()
+    val partClasses = createParentClasses(dataPartPackage, dataClassesPackage)
+    val dataList = buildDataList(dataPartPackage, partClasses.lastIndex)
 
     return listOf(
         JavaFile.builder(packageName, dataIface).build(),
         JavaFile.builder(packageName, dataImpl).build(),
         JavaFile.builder(packageName, dataList).build()
     ) + dataClasses.map {
-      JavaFile.builder(packageName, it).build()
+      JavaFile.builder(dataClassesPackage, it).build()
+    } + partClasses.map {
+      JavaFile.builder(dataPartPackage, it).build()
     }
+  }
+
+  private fun createParentClasses(
+      dataPartPackage: String,
+      dataClassesPackage: String
+  ): List<TypeSpec> {
+    val dataIface = ClassName.bestGuess("$packageName.Data")
+
+    val partBuilders = Lists
+        .partition((1..fieldsCount).toList(), PARTITION_SIZE)
+        .mapIndexed { index, partition ->
+          TypeSpec
+              .classBuilder("Part$index")
+              .addModifiers(PUBLIC)
+              .addFields(
+                  partition.map {
+                    FieldSpec.builder(
+                        dataIface,
+                        "data$it",
+                        PUBLIC
+                    ).initializer(
+                        CodeBlock.of(
+                            "new \$T()",
+                            ClassName.bestGuess("$dataClassesPackage.DataClass$it")
+                        )
+                    ).build()
+                  }
+              )
+        }
+
+    // set all the parent classes
+    partBuilders
+        .drop(1)
+        .mapIndexed { index, builder ->
+          builder.superclass(ClassName.bestGuess("$dataPartPackage.Part$index"))
+        }
+
+    return partBuilders.map { it.build() }
   }
 
   private fun createDataClasses(): List<TypeSpec> {
@@ -107,13 +154,18 @@ class NewClassAsField(
               MethodSpec
                   .constructorBuilder()
                   .addCode(superBlock)
+                  .addModifiers(PUBLIC)
                   .build()
-          )
-          .build()
+          ).addModifiers(
+              PUBLIC
+          ).build()
     }
   }
 
-  private fun buildDataList(): TypeSpec {
+  private fun buildDataList(
+      dataPartPackage: String,
+      topParentIndex: Int
+  ): TypeSpec {
     val dataList = TypeSpec.classBuilder(
         ClassName.get(
             packageName,
@@ -121,75 +173,60 @@ class NewClassAsField(
         )
     )
 
-    val modifiers = if (useStatic) {
-      arrayOf(PUBLIC, STATIC)
-    }
-    else {
-      arrayOf(PUBLIC)
-    }
-
-    dataList.addFields(
-        (1..fieldsCount).map {
-          FieldSpec.builder(
-              ClassName.bestGuess("$packageName.Data"),
-              "data$it",
-              *modifiers
-          ).initializer(
-              CodeBlock.of(
-                  "new \$T()",
-                  ClassName.bestGuess("$packageName.DataClass$it")
-              )
-          ).build()
-        }
+    dataList.superclass(
+        ClassName.bestGuess("$dataPartPackage.Part$topParentIndex")
     )
 
-    if (!useStatic) {
-      val thisClass = ClassName.bestGuess("$packageName.$className")
-      dataList.addField(
-          FieldSpec
-              .builder(
-                  thisClass,
-                  "instance"
-              ).addModifiers(
-                  PRIVATE, STATIC
-              ).initializer(
-                  CodeBlock.of("\$L", "null")
-              ).build()
-      )
-
-      val dollar = "$"
-
-      dataList.addMethod(
-          MethodSpec
-              .methodBuilder(
-                  "getInstance"
-              ).addModifiers(
-                  PUBLIC, STATIC, SYNCHRONIZED
-              ).returns(
-                  thisClass
-              ).addCode(
-                  CodeBlock.of(
-                      """
-                      | if(instance == null) {
-                      |   instance = new ${dollar}T();
-                      | }
-                      | return instance;
-                      |
-                    """.trimMargin(),
-                      thisClass
-                      )
-              ).build()
-      )
-
-      dataList.addMethod(
-          MethodSpec
-              .constructorBuilder()
-              .addModifiers(PRIVATE)
-              .build()
-      )
-    }
+    singletonPattern(dataList)
 
     return dataList.build()
+  }
+
+  private fun singletonPattern(dataList: Builder) {
+    val thisClass = ClassName.bestGuess("$packageName.$className")
+
+    dataList.addField(
+        FieldSpec
+            .builder(
+                thisClass,
+                "instance"
+            ).addModifiers(
+                PRIVATE, STATIC
+            ).initializer(
+                CodeBlock.of("\$L", "null")
+            ).build()
+    )
+
+    val dollar = "$"
+
+    dataList.addMethod(
+        MethodSpec
+            .methodBuilder(
+                "getInstance"
+            ).addModifiers(
+                PUBLIC, STATIC, SYNCHRONIZED
+            ).returns(
+                thisClass
+            ).addCode(
+                CodeBlock.of(
+                    """
+                        | if(instance == null) {
+                        |   instance = new ${dollar}T();
+                        | }
+                        | return instance;
+                        |
+                      """.trimMargin(),
+                    thisClass
+                )
+            ).build()
+    )
+
+    dataList.addMethod(
+        MethodSpec
+            .constructorBuilder()
+            .addModifiers(PRIVATE)
+            .build()
+    )
   }
 
   private fun createDataImpl(
@@ -202,6 +239,8 @@ class NewClassAsField(
         )
     ).addSuperinterface(
         ClassName.bestGuess("$packageName.Data")
+    ).addModifiers(
+        PUBLIC
     )
 
     dataImplFields.fold(dataImpl) { d, f ->
@@ -239,8 +278,9 @@ class NewClassAsField(
                       it.name
                   ).build()
                 }
-            )
-            .build()
+            ).addModifiers(
+                PUBLIC
+            ).build()
     )
 
     return dataImpl.build()
@@ -249,9 +289,12 @@ class NewClassAsField(
   private fun createDataInterface(
       dataImplFields: List<DataImplField>
   ): TypeSpec {
-    val dataIface = TypeSpec.interfaceBuilder(
-        ClassName.get(packageName, "Data")
-    )
+    val dataIface = TypeSpec
+        .interfaceBuilder(
+            ClassName.get(packageName, "Data")
+        ).addModifiers(
+            PUBLIC
+        )
 
     dataIface.addMethods(
         dataImplFields.map {
@@ -300,15 +343,8 @@ class NewClassAsField(
   }
 
   override fun verboseString(): String {
-    val what = if (useStatic) {
-      "Static"
-    }
-    else {
-      "Instance"
-    }
-
     return """
-            |$what fields initialized with 0-arg classes
+            |Infinity hierarchy chain fields.
           """.trimMargin()
   }
 

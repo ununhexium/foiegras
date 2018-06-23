@@ -3,6 +3,7 @@ package net.lab0.foiegras
 import net.lab0.foiegras.caze.BenchmarkResultImpl
 import net.lab0.foiegras.caze.JavaFlatCaseImpl
 import net.lab0.foiegras.caze.NewClassAsField
+import net.lab0.foiegras.caze.NewClassHierarchyForFields
 import net.lab0.foiegras.caze.NewObjectAsField
 import net.lab0.foiegras.caze.iface.BenchmarkCase
 import net.lab0.foiegras.caze.iface.BenchmarkResult
@@ -43,25 +44,33 @@ val log: Logger by lazy {
 /*
  * Enable or disable these options to filter which tests to run
  */
-val flatBench = false
-val objectBench = false
-val classBench = true
+const val flatBench = false
+const val objectBench = false
+const val classBench = false
+// warning, this one can theoretically have an unlimited amount of fields
+const val hierarchyBench = true
 
+/**
+ * Margin of error to find the maximum number of fields.
+ * Must be > 0
+ */
+const val ACCURACY = 1
 
 fun main(args: Array<String>) {
   val outputFolder = Paths.get("generated")
 
-  val todo = mapOf(
+  val todo = listOf(
       flatBench to generateFlatCases(outputFolder),
       objectBench to listOf(NewObjectAsField(outputFolder)),
       classBench to listOf(true, false).map {
         NewClassAsField(outputFolder, it)
-      }
+      },
+      hierarchyBench to listOf(NewClassHierarchyForFields(outputFolder))
   )
 
   val cases = todo
-      .filterKeys { it }
-      .flatMap { it.value }
+      .filter { it.first }
+      .flatMap { it.second }
 
   evaluateCases(cases)
 }
@@ -77,9 +86,12 @@ fun evaluateCases(cases: List<BenchmarkCase>) {
       log.info("Case ${onTheWay.size} out of ${cases.size}")
     }
 
+    val (low,high) = slowStart { case.evaluateAt(it) }
+
     val sweet = sweetspot(
-        accuracy = 1,
-        high = Math.min(case.upperBoundHint, 65536),
+        ACCURACY,
+        low,
+        high,
         test = { case.evaluateAt(it) }
     )
 
@@ -106,6 +118,32 @@ fun evaluateCases(cases: List<BenchmarkCase>) {
   log.info(result)
 }
 
+
+fun slowStart(test: (Int) -> Boolean): Pair<Int, Int> {
+  (0..30).forEach {
+    val attempt = power(2, it)
+    log.info("Slow start at $attempt")
+    if (!test(attempt)) {
+      return Pair(attempt / 2, attempt)
+    }
+  }
+  throw RuntimeException(
+      "Ahm, ... I'm not going to generate 2 billion classes!"
+  )
+}
+
+
+fun power(a: Int, b: Int): Int =
+    when {
+      b == 0 -> 1
+      b % 2 == 0 -> square { power(a, b / 2) }
+      else -> a * power(a, b - 1)
+    }
+
+fun square(a: () -> Int): Int {
+  val tmp = a()
+  return tmp * tmp
+}
 
 private fun generateFlatCases(outputFolder: Path)
     : List<JavaFlatCaseImpl> {

@@ -22,8 +22,7 @@ import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 
 class NewObjectAsField(
-    val outputFolder: Path,
-    override val upperBoundHint: Int = 1000
+    val outputFolder: Path
 ) : BenchmarkCase {
 
   var fieldsCount: Int = -1

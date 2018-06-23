@@ -38,11 +38,15 @@ class JavaBenchmarking {
       )
 
       val stderr = BufferedReader(InputStreamReader(javac.errorStream))
-      val expected = stderr.useLines {
-        it.filter {
-          it.contains("error: code too large")
-        }.count() > 0
+      val errorOutput = mutableListOf<String>()
+      stderr.useLines {
+        errorOutput.addAll(it)
       }
+
+      val expected = errorOutput.filter {
+        it.contains("error: code too large") ||
+            it.contains("error: too many constants")
+      }.count() > 0
 
       javac.waitFor()
 
@@ -50,6 +54,8 @@ class JavaBenchmarking {
       if (error) {
         val message = """
           |Compilation failed for @${argsFile.toFile().absolutePath}
+          |${errorOutput.joinToString("\n")}
+          |
         """.trimMargin()
 
         val compilationFailed = CompilationFailed(message)
