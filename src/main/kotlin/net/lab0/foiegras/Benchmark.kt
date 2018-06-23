@@ -3,6 +3,7 @@ package net.lab0.foiegras
 import net.lab0.foiegras.caze.BenchmarkResultImpl
 import net.lab0.foiegras.caze.JavaFlatCaseImpl
 import net.lab0.foiegras.caze.NewClassAsField
+import net.lab0.foiegras.caze.NewObjectAsField
 import net.lab0.foiegras.caze.iface.BenchmarkCase
 import net.lab0.foiegras.caze.iface.BenchmarkResult
 import java.nio.file.Path
@@ -40,27 +41,31 @@ val log: Logger by lazy {
 }
 
 
+val flatBench = false
+val objectBench = false
+val classBench = true
+
+
 fun main(args: Array<String>) {
   val outputFolder = Paths.get("generated")
 
-  val cases = listOf(
-//      generateFlatCases(outputFolder),
-      generateComplexCases(outputFolder)
-  ).flatMap { it }
+  val todo = mapOf(
+      flatBench to generateFlatCases(outputFolder),
+      objectBench to listOf(NewObjectAsField(outputFolder)),
+      classBench to listOf(true, false).map {
+        NewClassAsField(outputFolder, it)
+      }
+  )
+
+  val cases = todo
+      .filterKeys { it }
+      .flatMap { it.value }
 
   evaluateCases(cases)
 }
 
 
-fun generateComplexCases(outputFolder: Path): List<BenchmarkCase> {
-  return listOf(
-//      NewObjectAsField(outputFolder),
-      NewClassAsField(outputFolder)
-  )
-}
-
-
-fun evaluateCases(cases:List<BenchmarkCase>) {
+fun evaluateCases(cases: List<BenchmarkCase>) {
   log.info("On the way to test ${cases.size} cases")
   val onTheWay = mutableListOf<Any>()
 
@@ -141,7 +146,8 @@ fun sweetspot(
   else {
     if (test(middle)) {
       sweetspot(accuracy, middle, high, iteration + 1, test)
-    } else {
+    }
+    else {
       sweetspot(accuracy, low, middle, iteration + 1, test)
     }
   }

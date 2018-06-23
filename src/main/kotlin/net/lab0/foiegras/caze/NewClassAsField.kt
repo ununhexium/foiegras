@@ -22,6 +22,7 @@ import javax.lang.model.element.Modifier.STATIC
 
 class NewClassAsField(
     val outputFolder: Path,
+    val useStatic: Boolean,
     override val upperBoundHint: Int = 10000
 ) : BenchmarkCase {
 
@@ -32,6 +33,7 @@ class NewClassAsField(
         "base",
         "j",
         "initclasses",
+        if(useStatic){"static"}else{"instance"},
         this::class.simpleName?.toLowerCase(),
         "f$fieldsCount"
     ).joinToString(".")
@@ -65,7 +67,7 @@ class NewClassAsField(
     val dataImplFields = createAllFields()
     val dataIface = createDataInterface(dataImplFields)
     val dataImpl = createDataImpl(dataImplFields)
-    val dataClasses = createDataClasses(dataImplFields)
+    val dataClasses = createDataClasses()
     val dataList = buildDataList()
 
     return listOf(
@@ -77,7 +79,7 @@ class NewClassAsField(
     }
   }
 
-  private fun createDataClasses(dataImplFields: List<DataImplField>): List<TypeSpec> {
+  private fun createDataClasses(): List<TypeSpec> {
     val superBlock = CodeBlock.of(
         "\$L\n",
         """
@@ -114,12 +116,19 @@ class NewClassAsField(
         )
     )
 
+    val modifiers = if (useStatic) {
+      arrayOf(PUBLIC, STATIC)
+    }
+    else {
+      arrayOf(PUBLIC)
+    }
+
     dataList.addFields(
         (1..fieldsCount).map {
           FieldSpec.builder(
               ClassName.bestGuess("$packageName.Data"),
               "data$it",
-              PUBLIC, STATIC
+              *modifiers
           ).initializer(
               CodeBlock.of(
                   "new \$T()",
