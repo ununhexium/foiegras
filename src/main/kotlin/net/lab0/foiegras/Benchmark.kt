@@ -1,19 +1,23 @@
 package net.lab0.foiegras
 
-import net.lab0.foiegras.Language.JAVA
-import net.lab0.foiegras.Language.KOTLIN
-import net.lab0.foiegras.caze.JavaBenchmarkCandidate
-import net.lab0.foiegras.caze.JavaBenchmarkCaseImpl
+import net.lab0.foiegras.caze.BenchmarkResultImpl
+import net.lab0.foiegras.caze.JavaFlatCaseImpl
+import net.lab0.foiegras.caze.NewObjectAsField
+import net.lab0.foiegras.caze.iface.BenchmarkCase
+import net.lab0.foiegras.caze.iface.BenchmarkResult
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.logging.ConsoleHandler
 import java.util.logging.Level
 import java.util.logging.Logger
 import java.util.stream.Collectors
-import javax.lang.model.element.Modifier.*
+import javax.lang.model.element.Modifier.FINAL
+import javax.lang.model.element.Modifier.PUBLIC
+import javax.lang.model.element.Modifier.STATIC
+import javax.lang.model.element.Modifier.TRANSIENT
 
 /**
- * Java logging is just madness X(
+ * Java util logging is just madness X(
  */
 val log: Logger by lazy {
   Logger.getGlobal().level = Level.OFF
@@ -22,10 +26,10 @@ val log: Logger by lazy {
   }
 
   val l = Logger.getLogger(Logger::class.java.name)
-  l.level = Level.FINE
+  l.level = Level.FINEST
 
   val h = ConsoleHandler()
-  h.level = Level.FINE
+  h.level = Level.ALL
 
   l.addHandler(h)
   l.useParentHandlers = false
@@ -37,29 +41,41 @@ val log: Logger by lazy {
 
 
 fun main(args: Array<String>) {
-
   val outputFolder = Paths.get("generated")
 
-  val cases = generateCases(outputFolder)
+  val cases = listOf(
+//      generateFlatCases(outputFolder),
+      generateComplexCases(outputFolder)
+  ).flatMap { it }
 
+  evaluateCases(cases)
+}
+
+
+fun generateComplexCases(outputFolder: Path): List<BenchmarkCase> {
+  return listOf(
+      NewObjectAsField(outputFolder)
+  )
+}
+
+
+fun evaluateCases(cases:List<BenchmarkCase>) {
   log.info("On the way to test ${cases.size} cases")
-
   val onTheWay = mutableListOf<Any>()
 
-  val best = cases.parallelStream().map {
+  val best = cases.parallelStream().map { case ->
     synchronized(onTheWay) {
-      onTheWay += it
+      onTheWay += case
       log.info("Case ${onTheWay.size} out of ${cases.size}")
     }
 
-    sweetspot(
-        accuracy = 1000,
-        testBuilder = { fieldsCount ->
-          JavaBenchmarkCandidate(it, fieldsCount)
-        },
-        test = { generateAndCompile(it) }
+    val sweet = sweetspot(
+        accuracy = 1,
+        test = { case.evaluateAt(it) }
     )
-  }.collect(Collectors.toList()) as List<JavaBenchmarkCandidate>
+
+    return@map BenchmarkResultImpl(case, sweet)
+  }.collect(Collectors.toList()) as List<BenchmarkResult<*>>
 
   val result = best
       .groupBy { it.fieldsCount }
@@ -72,7 +88,7 @@ fun main(args: Array<String>) {
           |${it.key} fields
           |${it.value.size} elements
           |
-          |${it.value.joinToString("\n") { it.verbose() }}
+          |${it.value.joinToString("\n") { it.case.verboseString() }}
           |
           |
         """.trimMargin()
@@ -82,30 +98,21 @@ fun main(args: Array<String>) {
 }
 
 
-fun JavaBenchmarkCandidate.verbose() =
-    """
-      |Keywords: ${this.keywords.size} ${this.keywords.joinToString { it.name.toLowerCase() }}
-      |Initialisation ${this.initialized}
-      |
-    """.trimMargin()
-
-
-private fun generateCases(outputFolder: Path): List<JavaBenchmarkCaseImpl> {
+private fun generateFlatCases(outputFolder: Path)
+    : List<JavaFlatCaseImpl> {
   return listOf(true, false).flatMap { initialized ->
     listOf(PUBLIC, STATIC, TRANSIENT, FINAL)
         .listProgression()
-        .flatMap { keywords ->
-          listOf(JAVA).map { language ->
-            JavaBenchmarkCaseImpl(
-                language,
-                outputFolder,
-                keywords,
-                initialized
-            )
-          }
+        .map { keywords ->
+          JavaFlatCaseImpl(
+              outputFolder,
+              keywords,
+              initialized
+          )
         }
   }
 }
+
 
 private fun <E> List<E>.listProgression() = listOf(this)
     .flatMap { list ->
@@ -117,50 +124,23 @@ private fun <E> List<E>.listProgression() = listOf(this)
 /**
  * Binary search to find the highest possible fields count for each benchmark case
  */
-fun <T> sweetspot(
+fun sweetspot(
     accuracy: Int = 1,
     low: Int = 0,
     high: Int = 65536,
     iteration: Int = 0,
-    test: (T) -> Boolean,
-    testBuilder: (Int) -> T
-): T {
+    test: (Int) -> Boolean
+): Int {
   val middle = (low + high) / 2
-  val testCase = testBuilder(middle)
 
   log.fine("Sweet spot iteration $iteration")
 
-  return if (high - low <= accuracy) testCase
+  return if (high - low <= accuracy) middle
   else {
-    if (test(testCase)) {
-      sweetspot(accuracy, middle, high, iteration + 1, test, testBuilder)
+    if (test(middle)) {
+      sweetspot(accuracy, middle, high, iteration + 1, test)
     } else {
-      sweetspot(accuracy, low, middle, iteration + 1, test, testBuilder)
+      sweetspot(accuracy, low, middle, iteration + 1, test)
     }
-  }
-}
-
-
-fun generateAndCompile(candidate: JavaBenchmarkCandidate): Boolean {
-  log.finer(
-      """
-        |Generating a ${candidate.case.language} class with
-        |${candidate.fieldsCount} fields
-        |${candidate.keywords.size} keywords: ${candidate.keywords.joinToString { it.name.toLowerCase() }}
-        |${if (candidate.initialized) "With initialization" else "Unintialized"}
-        |
-      """.trimMargin()
-  )
-
-  return try {
-    when (candidate.language) {
-      JAVA -> JavaBenchmarking.generateAndCompileJava(candidate)
-      KOTLIN -> throw UnsupportedOperationException()
-    }
-
-    true
-  } catch (e: CompilationFailed) {
-    log.finer("Failed: ${e.message}")
-    false
   }
 }
