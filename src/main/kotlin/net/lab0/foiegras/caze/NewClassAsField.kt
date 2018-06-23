@@ -19,6 +19,7 @@ import javax.lang.model.element.Modifier.ABSTRACT
 import javax.lang.model.element.Modifier.PRIVATE
 import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
+import javax.lang.model.element.Modifier.SYNCHRONIZED
 
 class NewClassAsField(
     val outputFolder: Path,
@@ -33,7 +34,12 @@ class NewClassAsField(
         "base",
         "j",
         "initclasses",
-        if(useStatic){"static"}else{"instance"},
+        if (useStatic) {
+          "static"
+        }
+        else {
+          "instance"
+        },
         this::class.simpleName?.toLowerCase(),
         "f$fieldsCount"
     ).joinToString(".")
@@ -137,6 +143,52 @@ class NewClassAsField(
           ).build()
         }
     )
+
+    if (!useStatic) {
+      val thisClass = ClassName.bestGuess("$packageName.$className")
+      dataList.addField(
+          FieldSpec
+              .builder(
+                  thisClass,
+                  "instance"
+              ).addModifiers(
+                  PRIVATE, STATIC
+              ).initializer(
+                  CodeBlock.of("\$L", "null")
+              ).build()
+      )
+
+      val dollar = "$"
+
+      dataList.addMethod(
+          MethodSpec
+              .methodBuilder(
+                  "getInstance"
+              ).addModifiers(
+                  PUBLIC, STATIC, SYNCHRONIZED
+              ).returns(
+                  thisClass
+              ).addCode(
+                  CodeBlock.of(
+                      """
+                      | if(instance == null) {
+                      |   instance = new ${dollar}T();
+                      | }
+                      | return instance;
+                      |
+                    """.trimMargin(),
+                      thisClass
+                      )
+              ).build()
+      )
+
+      dataList.addMethod(
+          MethodSpec
+              .constructorBuilder()
+              .addModifiers(PRIVATE)
+              .build()
+      )
+    }
 
     return dataList.build()
   }
@@ -248,8 +300,17 @@ class NewClassAsField(
     )
   }
 
-  override fun verboseString() =
-      """
-        |Static fields initialized with constructors
-      """.trimMargin()
+  override fun verboseString(): String {
+    val what = if (useStatic) {
+      "Static"
+    }
+    else {
+      "Instance"
+    }
+
+    return """
+            |$what fields initialized with 0-arg classes
+          """.trimMargin()
+  }
+
 }

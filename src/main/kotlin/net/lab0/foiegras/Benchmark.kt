@@ -26,7 +26,7 @@ val log: Logger by lazy {
     it.level = Level.OFF
   }
 
-  val l = Logger.getLogger(Logger::class.java.name)
+  val l = Logger.getLogger("Benchmark")
   l.level = Level.FINE
 
   val h = ConsoleHandler()
@@ -37,10 +37,12 @@ val log: Logger by lazy {
 
   println("Handlers: " + l.handlers.size)
 
-  return@lazy l
+  return@lazy l // lots of work for a lazy init
 }
 
-
+/*
+ * Enable or disable these options to filter which tests to run
+ */
 val flatBench = false
 val objectBench = false
 val classBench = true
