@@ -23,6 +23,12 @@ import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 import javax.lang.model.element.Modifier.SYNCHRONIZED
 
+/**
+ * To infinity and beyond.
+ * This model exports all the data in external classes
+ * and uses classes hierarchies recursively to store
+ * fields everytime the amount goes above 5k.
+ */
 class NewClassHierarchyForFields(
     val outputFolder: Path
 ) : BenchmarkCase {

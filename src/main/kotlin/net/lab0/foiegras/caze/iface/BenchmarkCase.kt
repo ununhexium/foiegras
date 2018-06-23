@@ -1,5 +1,10 @@
 package net.lab0.foiegras.caze.iface
 
+/**
+ * Describes a benchmark case.
+ * That is, a source code generation model which will be tested
+ * for the maximum number of fields it can contain.
+ */
 interface BenchmarkCase {
   /**
    * Generates classes and compiles them.

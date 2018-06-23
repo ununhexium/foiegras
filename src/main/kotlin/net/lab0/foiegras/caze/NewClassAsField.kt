@@ -21,6 +21,12 @@ import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 import javax.lang.model.element.Modifier.SYNCHRONIZED
 
+/**
+ * Declares all the fields inside this class.
+ * Each fields contains the same amount of data
+ * as in [NewObjectAsField], but the data itself
+ * is exported to a different class.
+ */
 class NewClassAsField(
     val outputFolder: Path,
     val useStatic: Boolean

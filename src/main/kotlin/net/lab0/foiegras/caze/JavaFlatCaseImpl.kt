@@ -12,6 +12,11 @@ import net.lab0.foiegras.resolveFrom
 import java.nio.file.Path
 import javax.lang.model.element.Modifier
 
+/**
+ * Generates a single Java class with different options.
+ *
+ * Al the declared fields are in this class.
+ */
 class JavaFlatCaseImpl(
     override val outputFolder: Path,
     override val keywords: List<Modifier>,
@@ -66,7 +71,8 @@ class JavaFlatCaseImpl(
       JavaBenchmarking.compileJava(files)
 
       true
-    } catch (e: CompilationFailed) {
+    }
+    catch (e: CompilationFailed) {
       log.finer("Failed: ${e.message}")
       false
     }

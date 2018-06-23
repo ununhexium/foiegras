@@ -21,6 +21,11 @@ import javax.lang.model.element.Modifier.PRIVATE
 import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 
+/**
+ * Similar to the Flat case, but this generator
+ * puts much more data on each field. The data
+ * is declared directly inside this class.
+ */
 class NewObjectAsField(
     val outputFolder: Path
 ) : BenchmarkCase {
