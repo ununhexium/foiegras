@@ -1,6 +1,6 @@
 package net.lab0.foiegras
 
-enum class Language{
+enum class Language {
   JAVA,
   KOTLIN
 }

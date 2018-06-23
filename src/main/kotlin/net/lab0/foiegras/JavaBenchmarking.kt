@@ -1,71 +1,61 @@
 package net.lab0.foiegras
 
-import com.squareup.javapoet.ClassName
-import com.squareup.javapoet.FieldSpec
-import com.squareup.javapoet.JavaFile
-import com.squareup.javapoet.TypeName
-import com.squareup.javapoet.TypeSpec
+import com.squareup.javapoet.*
+import net.lab0.foiegras.caze.JavaBenchmarkCandidate
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.file.Path
 
-class JavaBenchmarking
-{
-  companion object
-  {
-    fun generateJavaClass(
-        packageName: String,
-        className: String,
-        fieldsCount: Int = 0
-    ): JavaFile
-    {
+class JavaBenchmarking {
+  companion object {
+    fun generateJavaClass(candidate: JavaBenchmarkCandidate): JavaFile {
       val typeSpec = TypeSpec.classBuilder(
           ClassName.get(
-              packageName,
-              className
+              candidate.packageName,
+              candidate.className
           )
       )
 
-      (0 until fieldsCount).forEach {
-        typeSpec.addField(
-            FieldSpec.builder(
-                TypeName.BYTE, "field$it"
-            ).build()
+      (0 until candidate.fieldsCount).forEach {
+
+        val fieldSpec = FieldSpec.builder(
+            TypeName.BYTE, "field$it", *candidate.keywords.toTypedArray()
         )
+
+        if (candidate.initialized) {
+          fieldSpec.initializer("\$L", "$it % Byte.MAX_VALUE")
+        }
+
+        typeSpec.addField(fieldSpec.build())
       }
 
       return JavaFile.builder(
-          packageName,
+          candidate.packageName,
           typeSpec.build()
       ).build()
     }
 
 
-    fun generateAndCompileJava(
-        outputFolder: Path,
-        packageName: String,
-        fieldsCount: Int
-    )
-    {
-      val className = "Test"
-      val sourceCode = generateJavaClass(
-          packageName,
-          className,
-          fieldsCount = fieldsCount
-      )
-      sourceCode.writeTo(outputFolder)
+    fun generateAndCompileJava(candidate: JavaBenchmarkCandidate) {
+      val sourceCode = generateJavaClass(candidate)
+      sourceCode.writeTo(candidate.case.outputFolder)
 
-      val paths = packageName.split(".") + "$className.java"
-      val outputFile = paths.fold(outputFolder) { path, s -> path.resolve(s) }
+      val paths = candidate.packageName.split(".") + "${candidate.className}.java"
+      val outputFile = paths.fold(candidate.outputFolder) { path, s ->
+        path.resolve(s)
+      }
 
       compileJava(outputFile)
     }
 
+
     @Throws(CompilationFailed::class)
-    fun compileJava(file: Path)
-    {
+    fun compileJava(file: Path) {
+      val absoluteFile = file.toAbsolutePath().toFile().toString()
+      log.finer("Compiling java $absoluteFile")
+
       val javac = Runtime.getRuntime().exec(
-          arrayOf("javac", file.toAbsolutePath().toFile().toString())
+          arrayOf("javac", absoluteFile)
       )
 
       val stderr = BufferedReader(InputStreamReader(javac.errorStream))
@@ -73,16 +63,14 @@ class JavaBenchmarking
       javac.waitFor()
 
       val error = javac.exitValue() != 0
-      if (error)
-      {
+      if (error) {
         val message = """
-          |Compilation failed for file $file
+          |Compilation failed for file $absoluteFile
           |${stderr.readLines().joinToString("\n")}
         """.trimMargin()
 
         throw CompilationFailed(message)
       }
     }
-
   }
 }
