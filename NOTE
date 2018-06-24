@@ -12,3 +12,108 @@ Caused by: java.io.IOException: error=7, Argument list too long
 
 
 5GB to compile 0.5M fields
+
+
+
+Output sample
+
+65521 fields
+10 elements
+
+DataType: byte ; Keywords: 2 public, static ; Initialisation false
+
+DataType: byte ; Keywords: 1 public ; Initialisation false
+
+DataType: short ; Keywords: 2 public, static ; Initialisation false
+
+DataType: short ; Keywords: 1 public ; Initialisation false
+
+DataType: int ; Keywords: 2 public, static ; Initialisation false
+
+DataType: int ; Keywords: 1 public ; Initialisation false
+
+DataType: long ; Keywords: 2 public, static ; Initialisation false
+
+DataType: long ; Keywords: 1 public ; Initialisation false
+
+DataType: Object ; Keywords: 2 public, static ; Initialisation false
+
+DataType: Object ; Keywords: 1 public ; Initialisation false
+
+
+
+
+65391 fields
+10 elements
+
+DataType: byte ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: short ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: int ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: long ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: Object ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: byte ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: short ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: int ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: long ; Keywords: 3 public, final, static ; Initialisation true
+
+DataType: Object ; Keywords: 3 public, final, static ; Initialisation true
+
+
+
+
+13232 fields
+5 elements
+
+DataType: byte ; Keywords: 2 public, static ; Initialisation true
+
+DataType: short ; Keywords: 2 public, static ; Initialisation true
+
+DataType: int ; Keywords: 2 public, static ; Initialisation true
+
+DataType: long ; Keywords: 2 public, static ; Initialisation true
+
+DataType: Object ; Keywords: 2 public, static ; Initialisation true
+
+
+
+
+11008 fields
+15 elements
+
+DataType: byte ; Keywords: 2 public, final ; Initialisation true
+
+DataType: byte ; Keywords: 1 public ; Initialisation true
+
+DataType: short ; Keywords: 2 public, final ; Initialisation true
+
+DataType: short ; Keywords: 1 public ; Initialisation true
+
+DataType: int ; Keywords: 2 public, final ; Initialisation true
+
+DataType: int ; Keywords: 1 public ; Initialisation true
+
+DataType: long ; Keywords: 2 public, final ; Initialisation true
+
+DataType: long ; Keywords: 1 public ; Initialisation true
+
+DataType: Object ; Keywords: 2 public, final ; Initialisation true
+
+DataType: Object ; Keywords: 1 public ; Initialisation true
+
+DataType: byte ; Keywords: 2 public, final ; Initialisation true
+
+DataType: short ; Keywords: 2 public, final ; Initialisation true
+
+DataType: int ; Keywords: 2 public, final ; Initialisation true
+
+DataType: long ; Keywords: 2 public, final ; Initialisation true
+
+DataType: Object ; Keywords: 2 public, final ; Initialisation true

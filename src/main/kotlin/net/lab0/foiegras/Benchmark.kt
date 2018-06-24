@@ -1,5 +1,7 @@
 package net.lab0.foiegras
 
+import com.google.common.collect.Lists
+import com.squareup.javapoet.TypeName
 import net.lab0.foiegras.caze.BenchmarkResultImpl
 import net.lab0.foiegras.caze.JavaFlatCaseImpl
 import net.lab0.foiegras.caze.NewClassAsField
@@ -13,10 +15,14 @@ import java.util.logging.ConsoleHandler
 import java.util.logging.Level
 import java.util.logging.Logger
 import java.util.stream.Collectors
+import javax.lang.model.element.Modifier
 import javax.lang.model.element.Modifier.FINAL
+import javax.lang.model.element.Modifier.PRIVATE
+import javax.lang.model.element.Modifier.PROTECTED
 import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
 import javax.lang.model.element.Modifier.TRANSIENT
+import javax.lang.model.element.Modifier.VOLATILE
 
 /**
  * Java util logging is just madness X(
@@ -44,17 +50,22 @@ val log: Logger by lazy {
 /*
  * Enable or disable these options to filter which tests to run
  */
-const val flatBench = false
+const val flatBench = true
 const val objectBench = false
 const val classBench = false
+
 // warning, this one can theoretically have an unlimited amount of fields
-const val hierarchyBench = true
+const val hierarchyBench = false
+
+// test absolutely all combinations. Will take a long time to finish
+const val fullBench = false
 
 /**
  * Margin of error to find the maximum number of fields.
  * Must be > 0
  */
 const val ACCURACY = 1
+
 
 fun main(args: Array<String>) {
   val outputFolder = Paths.get("generated")
@@ -86,7 +97,7 @@ fun evaluateCases(cases: List<BenchmarkCase>) {
       log.info("Case ${onTheWay.size} out of ${cases.size}")
     }
 
-    val (low,high) = slowStart { case.evaluateAt(it) }
+    val (low, high) = slowStart { case.evaluateAt(it) }
 
     val sweet = sweetspot(
         ACCURACY,
@@ -145,18 +156,69 @@ fun square(a: () -> Int): Int {
   return tmp * tmp
 }
 
+
 private fun generateFlatCases(outputFolder: Path)
     : List<JavaFlatCaseImpl> {
+
+  // can't use null in cartesian product. This is a placeholder for it
+  val none = "none"
+
+  val access = if (fullBench) {
+    listOf(PUBLIC, PROTECTED, PRIVATE, none)
+  }
+  else {
+    listOf(PUBLIC)
+  }
+
+  val modification = if (fullBench) {
+    listOf(VOLATILE, FINAL, none)
+  }
+  else {
+    listOf(FINAL, none)
+  }
+
+  val static = listOf(STATIC, none)
+  val transient = if (fullBench) {
+    listOf(TRANSIENT, none)
+  }
+  else {
+    listOf(none)
+  }
+
+  val allCombinations = Lists.cartesianProduct(
+      access,
+      modification,
+      static,
+      transient
+  ).map {
+    it.filter { it != none } as List<Modifier>
+  }.distinct()
+
+  val types = if(fullBench){
+    listOf(
+        TypeName.BYTE,
+        TypeName.SHORT,
+        TypeName.INT,
+        TypeName.LONG,
+        TypeName.OBJECT
+    )
+  }
+  else{
+    listOf(TypeName.BYTE)
+  }
+  
   return listOf(true, false).flatMap { initialized ->
-    listOf(PUBLIC, STATIC, TRANSIENT, FINAL)
-        .listProgression()
-        .map { keywords ->
-          JavaFlatCaseImpl(
-              outputFolder,
-              keywords,
-              initialized
-          )
-        }
+    types.flatMap { type ->
+      allCombinations
+          .map { keywords ->
+            JavaFlatCaseImpl(
+                outputFolder,
+                type,
+                keywords,
+                initialized
+            )
+          }
+    }
   }
 }
 

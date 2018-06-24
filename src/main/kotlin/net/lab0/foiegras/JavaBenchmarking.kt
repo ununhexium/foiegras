@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class JavaBenchmarking {
   companion object {
 
-    val counter = AtomicInteger(1)
+    private val counter = AtomicInteger(1)
 
     @Throws(CompilationFailed::class)
     fun compileJava(files: List<Path>) {

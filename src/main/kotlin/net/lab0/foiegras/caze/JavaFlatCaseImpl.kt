@@ -19,6 +19,7 @@ import javax.lang.model.element.Modifier
  */
 class JavaFlatCaseImpl(
     override val outputFolder: Path,
+    override val type: TypeName,
     override val keywords: List<Modifier>,
     override val init: Boolean
 ) : JavaFlatCase {
@@ -40,7 +41,7 @@ class JavaFlatCaseImpl(
     }
 
   val className
-    get() = "C$fieldsCount${if (initialized) "Init" else ""}Fields${keywordsClassNamePart}Class"
+    get() = "C$fieldsCount${if (initialized) "Init" else ""}${type.keywordHack()}Fields${keywordsClassNamePart}Class"
 
   override val initialized
     get() = init || keywords.contains(Modifier.FINAL)
@@ -109,8 +110,19 @@ class JavaFlatCaseImpl(
 
   override fun verboseString() =
       """
-        |Keywords: ${this.keywords.size} ${this.keywords.joinToString { it.name.toLowerCase() }}
-        |Initialisation ${this.initialized}
+        |DataType: ${type.keywordHack()} ; Keywords: ${this.keywords.size} ${this.keywords.joinToString { it.name.toLowerCase() }} ; Initialisation ${this.initialized}
         |
       """.trimMargin()
+
+
+  private fun TypeName.keywordHack(): String {
+    return when (this) {
+      TypeName.BYTE -> "byte"
+      TypeName.SHORT -> "short"
+      TypeName.INT -> "int"
+      TypeName.LONG -> "long"
+      TypeName.OBJECT -> "Object"
+      else -> this.toString()
+    }
+  }
 }
