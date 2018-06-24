@@ -11,9 +11,6 @@ import net.lab0.foiegras.caze.iface.BenchmarkCase
 import net.lab0.foiegras.caze.iface.BenchmarkResult
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.logging.ConsoleHandler
-import java.util.logging.Level
-import java.util.logging.Logger
 import java.util.stream.Collectors
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.Modifier.FINAL
@@ -24,34 +21,11 @@ import javax.lang.model.element.Modifier.STATIC
 import javax.lang.model.element.Modifier.TRANSIENT
 import javax.lang.model.element.Modifier.VOLATILE
 
-/**
- * Java util logging is just madness X(
- */
-val log: Logger by lazy {
-  Logger.getGlobal().level = Level.OFF
-  Logger.getGlobal().handlers.forEach {
-    it.level = Level.OFF
-  }
-
-  val l = Logger.getLogger("Benchmark")
-  l.level = Level.FINE
-
-  val h = ConsoleHandler()
-  h.level = Level.ALL
-
-  l.addHandler(h)
-  l.useParentHandlers = false
-
-  println("Handlers: " + l.handlers.size)
-
-  return@lazy l // lots of work for a lazy init
-}
-
 /*
  * Enable or disable these options to filter which tests to run
  */
-const val flatBench = true
-const val objectBench = false
+const val flatBench = false
+const val objectBench = true
 const val classBench = false
 
 // warning, this one can theoretically have an unlimited amount of fields
@@ -72,7 +46,7 @@ fun main(args: Array<String>) {
 
   val todo = listOf(
       flatBench to generateFlatCases(outputFolder),
-      objectBench to listOf(NewObjectAsField(outputFolder)),
+      objectBench to generateObjectCases(outputFolder),
       classBench to listOf(true, false).map {
         NewClassAsField(outputFolder, it)
       },
@@ -87,34 +61,50 @@ fun main(args: Array<String>) {
 }
 
 
+fun generateObjectCases(outputFolder: Path) =
+    listOf(true,false).map{
+      NewObjectAsField(outputFolder, it)
+    }
+
+
 fun evaluateCases(cases: List<BenchmarkCase>) {
   log.info("On the way to test ${cases.size} cases")
   val onTheWay = mutableListOf<Any>()
+  val best = evaluate(cases, onTheWay)
+  showResult(best)
+}
 
-  val best = cases.parallelStream().map { case ->
-    synchronized(onTheWay) {
-      onTheWay += case
-      log.info("Case ${onTheWay.size} out of ${cases.size}")
-    }
 
-    val (low, high) = slowStart { case.evaluateAt(it) }
+private fun evaluate(
+    cases: List<BenchmarkCase>,
+    onTheWay: MutableList<Any>
+) =
+    cases
+        .parallelStream()
+        .map { case ->
+          synchronized(onTheWay) {
+            onTheWay += case
+            log.info("Case ${onTheWay.size} out of ${cases.size}")
+          }
 
-    val sweet = sweetspot(
-        ACCURACY,
-        low,
-        high,
-        test = { case.evaluateAt(it) }
-    )
+          val (low, high) = slowStart { case.evaluateAt(it) }
 
-    return@map BenchmarkResultImpl(case, sweet)
-  }.collect(Collectors.toList()) as List<BenchmarkResult<*>>
+          val sweet = sweetspot(
+              ACCURACY,
+              low,
+              high
+          ) { case.evaluateAt(it) }
 
+          return@map BenchmarkResultImpl(case, sweet)
+        }.collect(Collectors.toList()) as List<BenchmarkResult<*>>
+
+
+private fun showResult(best: List<BenchmarkResult<*>>) {
   val result = best
       .groupBy { it.fieldsCount }
       .toSortedMap(Comparator { o1, o2 -> o2 - o1 })
       .entries
       .joinToString("\n") {
-
         """
           |
           |${it.key} fields
@@ -129,7 +119,9 @@ fun evaluateCases(cases: List<BenchmarkCase>) {
   log.info(result)
 }
 
-
+/**
+ * @return `Pair<LowerBound, HigherBound>`
+ */
 fun slowStart(test: (Int) -> Boolean): Pair<Int, Int> {
   (0..30).forEach {
     val attempt = power(2, it)
@@ -139,7 +131,7 @@ fun slowStart(test: (Int) -> Boolean): Pair<Int, Int> {
     }
   }
   throw RuntimeException(
-      "Ahm, ... I'm not going to generate 2 billion classes!"
+      "Ahm, ... I'm not going to generate 2 billion fields!"
   )
 }
 
@@ -160,30 +152,11 @@ fun square(a: () -> Int): Int {
 private fun generateFlatCases(outputFolder: Path)
     : List<JavaFlatCaseImpl> {
 
-  // can't use null in cartesian product. This is a placeholder for it
-  val none = "none"
-
-  val access = if (fullBench) {
-    listOf(PUBLIC, PROTECTED, PRIVATE, none)
-  }
-  else {
-    listOf(PUBLIC)
-  }
-
-  val modification = if (fullBench) {
-    listOf(VOLATILE, FINAL, none)
-  }
-  else {
-    listOf(FINAL, none)
-  }
-
-  val static = listOf(STATIC, none)
-  val transient = if (fullBench) {
-    listOf(TRANSIENT, none)
-  }
-  else {
-    listOf(none)
-  }
+  val access = buildAccessibilityList()
+  val modification = buildModificatorsList()
+  val static = buildStaticList()
+  val transient = buildTransientList()
+  val types = buildTypesList()
 
   val allCombinations = Lists.cartesianProduct(
       access,
@@ -191,22 +164,9 @@ private fun generateFlatCases(outputFolder: Path)
       static,
       transient
   ).map {
-    it.filter { it != none } as List<Modifier>
+    it.filter { it != NULL } as List<Modifier>
   }.distinct()
 
-  val types = if(fullBench){
-    listOf(
-        TypeName.BYTE,
-        TypeName.SHORT,
-        TypeName.INT,
-        TypeName.LONG,
-        TypeName.OBJECT
-    )
-  }
-  else{
-    listOf(TypeName.BYTE)
-  }
-  
   return listOf(true, false).flatMap { initialized ->
     types.flatMap { type ->
       allCombinations
@@ -222,18 +182,65 @@ private fun generateFlatCases(outputFolder: Path)
   }
 }
 
+private fun buildTypesList(): List<TypeName> {
+  return if (fullBench) {
+    listOf(
+        TypeName.BYTE,
+        TypeName.SHORT,
+        TypeName.INT,
+        TypeName.LONG,
+        TypeName.OBJECT
+    )
+  }
+  else {
+    listOf(TypeName.BYTE)
+  }
+}
 
-private fun <E> List<E>.listProgression() = listOf(this)
-    .flatMap { list ->
-      (0..list.size).map { quantity ->
-        list.take(quantity)
-      }
+private fun buildStaticList() = listOf(STATIC, NULL)
+
+private fun buildTransientList() =
+    if (fullBench) {
+      listOf(TRANSIENT, NULL)
+    }
+    else {
+      listOf(NULL)
+    }
+
+private fun buildModificatorsList() =
+    if (fullBench) {
+      listOf(VOLATILE, FINAL, NULL)
+    }
+    else {
+      listOf(FINAL, NULL)
+    }
+
+private fun buildAccessibilityList() =
+    if (fullBench) {
+      listOf(PUBLIC, PROTECTED, PRIVATE, NULL)
+    }
+    else {
+      listOf(PUBLIC)
     }
 
 /**
  * Binary search to find the highest possible fields count for each benchmark case
  */
 fun sweetspot(
+    accuracy: Int = 1,
+    low: Int = Int.MIN_VALUE,
+    high: Int = Int.MAX_VALUE,
+    test: (Int) -> Boolean
+) = binarySearch(
+    Math.max(accuracy, 1),
+    Math.max(low, 1),
+    high,
+    1,
+    test
+)
+
+
+fun binarySearch(
     accuracy: Int = 1,
     low: Int = 0,
     high: Int = 65536,
@@ -247,10 +254,10 @@ fun sweetspot(
   return if (high - low <= accuracy) middle
   else {
     if (test(middle)) {
-      sweetspot(accuracy, middle, high, iteration + 1, test)
+      binarySearch(accuracy, middle, high, iteration + 1, test)
     }
     else {
-      sweetspot(accuracy, low, middle, iteration + 1, test)
+      binarySearch(accuracy, low, middle, iteration + 1, test)
     }
   }
 }

@@ -16,10 +16,12 @@ import net.lab0.foiegras.getter
 import net.lab0.foiegras.log
 import net.lab0.foiegras.resolveFrom
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import javax.lang.model.element.Modifier.ABSTRACT
 import javax.lang.model.element.Modifier.PRIVATE
 import javax.lang.model.element.Modifier.PUBLIC
 import javax.lang.model.element.Modifier.STATIC
+import kotlin.math.nextUp
 
 /**
  * Similar to the Flat case, but this generator
@@ -27,10 +29,14 @@ import javax.lang.model.element.Modifier.STATIC
  * is declared directly inside this class.
  */
 class NewObjectAsField(
-    val outputFolder: Path
+    val outputFolder: Path,
+    val variableDeclaration: Boolean
 ) : BenchmarkCase {
 
   var fieldsCount: Int = -1
+
+  var someFloat = AtomicReference(Float.MIN_VALUE)
+  var someInt = Int.MIN_VALUE
 
   val packageName
     get() = listOf(
@@ -42,7 +48,17 @@ class NewObjectAsField(
     ).joinToString(".")
 
   val className
-    get() = "CInitObjects${fieldsCount}Fields"
+    get() = listOf(
+        "CInitObjects",
+        fieldsCount,
+        if (variableDeclaration) {
+          "var"
+        }
+        else {
+          "const"
+        },
+        "Fields"
+    ).joinToString("")
 
   override fun evaluateAt(fieldsCount: Int): Boolean {
     this.fieldsCount = fieldsCount
@@ -90,14 +106,14 @@ class NewObjectAsField(
     val initBlock = CodeBlock.of(
         "\$L",
         """
-                    | new DataImpl(
-                    |   "Hello",
-                    |   null,
-                    |   Integer.MIN_VALUE,
-                    |   Integer.MAX_VALUE,
-                    |   new Float[] {0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f}
-                    | )
-                  """.trimMargin()
+          | new DataImpl(
+          |   "Hello",
+          |   null,
+          |   Integer.MIN_VALUE,
+          |   Integer.MAX_VALUE,
+          |   new Float[] {0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f}
+          | )
+        """.trimMargin()
     )
 
     dataList.addFields(
@@ -107,13 +123,33 @@ class NewObjectAsField(
               "data$it",
               PUBLIC, STATIC
           ).initializer(
-              initBlock
+              if (variableDeclaration) {
+                genCodeBlock(it)
+              }
+              else {
+                initBlock
+              }
           ).build()
         }
     )
 
     return dataList
   }
+
+  private fun genCodeBlock(index: Int) = CodeBlock.of(
+      "\$L",
+      """
+        | new DataImpl(
+        |   "Hello$index",
+        |   new String("$index@${someInt++}"),
+        |   ${someInt++},
+        |   ${someInt++},
+        |   new Float[] {
+        |   ${(0..9).map { someFloat.getAndNextUp() }.joinToString { it.toString() + "f" }}
+        |   }
+        | )
+      """.trimMargin()
+  )
 
   private fun createDataImpl(
       dataImplFields: List<DataImplField>
@@ -221,8 +257,23 @@ class NewObjectAsField(
     )
   }
 
-  override fun verboseString() =
-      """
-        |Static fields initialized with constructors
+  override fun verboseString(): String {
+    val what = if (variableDeclaration) {
+      "variable values"
+    }
+    else {
+      "constant values"
+    }
+    return """
+        |Static fields initialized with constructors using $what
       """.trimMargin()
+  }
+
+
+  private fun AtomicReference<Float>.getAndNextUp(): Float {
+    val next = this.get().nextUp()
+    this.set(next)
+    return next
+  }
+
 }

@@ -39,6 +39,17 @@ A model to overcome the class file limitation by
 using the class hierarchy to spread the declarations 
 in several files.
 
+## Run the tests
+
+* Review the benchmark options.
+* Free several GB of disk space.
+* Execute the main function in `Benchmark.kt`.
+* Clean up the `generated` folder.
+
+## TODOs
+
+Add option to clear the generated data of each test.
+
 ---
 
 ###### Foie gras
