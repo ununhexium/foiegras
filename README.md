@@ -41,7 +41,7 @@ in several files.
 
 ## Run the tests
 
-* Review the benchmark options.
+* Review the benchmark options above the main function.
 * Free several GB of disk space.
 * Execute the main function in `Benchmark.kt`.
 * Clean up the `generated` folder.

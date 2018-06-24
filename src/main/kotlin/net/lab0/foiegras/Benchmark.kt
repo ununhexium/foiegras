@@ -4,9 +4,9 @@ import com.google.common.collect.Lists
 import com.squareup.javapoet.TypeName
 import net.lab0.foiegras.caze.BenchmarkResultImpl
 import net.lab0.foiegras.caze.JavaFlatCaseImpl
-import net.lab0.foiegras.caze.NewClassAsField
-import net.lab0.foiegras.caze.NewClassHierarchyForFields
-import net.lab0.foiegras.caze.NewObjectAsField
+import net.lab0.foiegras.caze.complex.NewClassAsField
+import net.lab0.foiegras.caze.complex.NewClassHierarchyForFields
+import net.lab0.foiegras.caze.complex.NewObjectAsField
 import net.lab0.foiegras.caze.iface.BenchmarkCase
 import net.lab0.foiegras.caze.iface.BenchmarkResult
 import java.nio.file.Path
@@ -24,9 +24,9 @@ import javax.lang.model.element.Modifier.VOLATILE
 /*
  * Enable or disable these options to filter which tests to run
  */
-const val flatBench = false
+const val flatBench = true
 const val objectBench = true
-const val classBench = false
+const val classBench = true
 
 // warning, this one can theoretically have an unlimited amount of fields
 const val hierarchyBench = false
@@ -38,7 +38,12 @@ const val fullBench = false
  * Margin of error to find the maximum number of fields.
  * Must be > 0
  */
-const val ACCURACY = 1
+const val ACCURACY = 1000
+
+/**
+ * To be faster if your computer isn't dying of heat exhaustion
+ */
+const val parallelEvaluation = false
 
 
 fun main(args: Array<String>) {
@@ -50,7 +55,11 @@ fun main(args: Array<String>) {
       classBench to listOf(true, false).map {
         NewClassAsField(outputFolder, it)
       },
-      hierarchyBench to listOf(NewClassHierarchyForFields(outputFolder))
+      hierarchyBench to listOf(
+          NewClassHierarchyForFields(
+              outputFolder
+          )
+      )
   )
 
   val cases = todo
@@ -62,7 +71,7 @@ fun main(args: Array<String>) {
 
 
 fun generateObjectCases(outputFolder: Path) =
-    listOf(true,false).map{
+    listOf(true, false).map {
       NewObjectAsField(outputFolder, it)
     }
 
@@ -79,8 +88,12 @@ private fun evaluate(
     cases: List<BenchmarkCase>,
     onTheWay: MutableList<Any>
 ) =
-    cases
-        .parallelStream()
+    if (parallelEvaluation) {
+      cases.parallelStream()
+    }
+    else {
+      cases.stream()
+    }
         .map { case ->
           synchronized(onTheWay) {
             onTheWay += case

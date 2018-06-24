@@ -17,4 +17,9 @@ interface BenchmarkCase {
    * Explicitly tell what has been tested.
    */
   fun verboseString(): String
+
+  /**
+   * @return the exception that cause the last compilation failure
+   */
+  fun getLastFailureCause(): Throwable
 }

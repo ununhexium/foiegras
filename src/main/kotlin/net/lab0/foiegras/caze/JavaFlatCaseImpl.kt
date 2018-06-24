@@ -5,10 +5,7 @@ import com.squareup.javapoet.FieldSpec
 import com.squareup.javapoet.JavaFile
 import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
-import net.lab0.foiegras.CompilationFailed
-import net.lab0.foiegras.JavaBenchmarking
-import net.lab0.foiegras.log
-import net.lab0.foiegras.resolveFrom
+import net.lab0.foiegras.caze.iface.AbstractBenchmarkCase
 import java.nio.file.Path
 import javax.lang.model.element.Modifier
 
@@ -18,68 +15,35 @@ import javax.lang.model.element.Modifier
  * Al the declared fields are in this class.
  */
 class JavaFlatCaseImpl(
-    override val outputFolder: Path,
+    outputFolder: Path,
     override val type: TypeName,
     override val keywords: List<Modifier>,
     override val init: Boolean
-) : JavaFlatCase {
-
-  var fieldsCount: Int = -1
+) : AbstractBenchmarkCase(outputFolder), JavaFlatCase {
 
   val packageName
     get() = listOf(
         "base",
         "j",
         this::class.simpleName?.toLowerCase(),
-        "f$fieldsCount",
-        "k$keywordsClassNamePart"
+        "k$keywordsNamePart",
+        if (initialized) "init" else "empty",
+        "t${type.keywordHack()}",
+        "f$fieldsCount"
     ).joinToString(".")
 
-  private val keywordsClassNamePart
+  private val keywordsNamePart
     get() = keywords.joinToString(separator = "") {
       it.name.toLowerCase().capitalize()
     }
 
   val className
-    get() = "C$fieldsCount${if (initialized) "Init" else ""}${type.keywordHack()}Fields${keywordsClassNamePart}Class"
+    get() = "C${fieldsCount}Fields"
 
   override val initialized
     get() = init || keywords.contains(Modifier.FINAL)
 
-  override fun evaluateAt(fieldsCount: Int): Boolean {
-    this.fieldsCount = fieldsCount
-    return generateAndCompile()
-  }
-
-
-  fun generateAndCompile(): Boolean {
-    log.finer(
-        """
-        |Generating a flat java class with
-        |$fieldsCount fields
-        |${keywords.size} keywords: ${keywords.joinToString { it.name.toLowerCase() }}
-        |${if (initialized) "With initialization" else "Uninitialized"}
-        |
-      """.trimMargin()
-    )
-
-    return try {
-      val sources = generateFlatJavaClass()
-      val files = sources.map {
-        it.writeTo(outputFolder)
-        return@map it.resolveFrom(outputFolder)
-      }
-      JavaBenchmarking.compileJava(files)
-
-      true
-    }
-    catch (e: CompilationFailed) {
-      log.finer("Failed: ${e.message}")
-      false
-    }
-  }
-
-  fun generateFlatJavaClass(): List<JavaFile> {
+  override fun generateJavaClasses(): List<JavaFile> {
     val typeSpec = TypeSpec.classBuilder(
         ClassName.get(
             packageName,
@@ -110,7 +74,7 @@ class JavaFlatCaseImpl(
 
   override fun verboseString() =
       """
-        |DataType: ${type.keywordHack()} ; Keywords: ${this.keywords.size} ${this.keywords.joinToString { it.name.toLowerCase() }} ; Initialisation ${this.initialized}
+        |DataType: ${type.keywordHack()} ; Keywords: ${this.keywords.size} ${this.keywords.joinToString { it.name.toLowerCase() }} ; Initialisation ${this.initialized}. Failed because ${getCauseString()}
         |
       """.trimMargin()
 

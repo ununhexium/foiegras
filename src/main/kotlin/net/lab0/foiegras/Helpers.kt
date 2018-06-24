@@ -18,7 +18,7 @@ val log: Logger by lazy {
   }
 
   val l = Logger.getLogger("Benchmark")
-  l.level = Level.FINE
+  l.level = Level.FINER
 
   val h = ConsoleHandler()
   h.level = Level.ALL
