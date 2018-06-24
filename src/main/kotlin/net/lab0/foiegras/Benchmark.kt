@@ -52,14 +52,8 @@ fun main(args: Array<String>) {
   val todo = listOf(
       flatBench to generateFlatCases(outputFolder),
       objectBench to generateObjectCases(outputFolder),
-      classBench to listOf(true, false).map {
-        NewClassAsField(outputFolder, it)
-      },
-      hierarchyBench to listOf(
-          NewClassHierarchyForFields(
-              outputFolder
-          )
-      )
+      classBench to generateClassAsFieldCases(outputFolder),
+      hierarchyBench to listOf(NewClassHierarchyForFields(outputFolder))
   )
 
   val cases = todo
@@ -67,6 +61,12 @@ fun main(args: Array<String>) {
       .flatMap { it.second }
 
   evaluateCases(cases)
+}
+
+private fun generateClassAsFieldCases(outputFolder: Path): List<NewClassAsField> {
+  return listOf(true, false).map {
+    NewClassAsField(outputFolder, it)
+  }
 }
 
 
@@ -109,7 +109,7 @@ private fun evaluate(
           ) { case.evaluateAt(it) }
 
           return@map BenchmarkResultImpl(case, sweet)
-        }.collect(Collectors.toList()) as List<BenchmarkResult<*>>
+        }.collect(Collectors.toList())
 
 
 private fun showResult(best: List<BenchmarkResult<*>>) {
@@ -177,7 +177,7 @@ private fun generateFlatCases(outputFolder: Path)
       static,
       transient
   ).map {
-    it.filter { it != NULL } as List<Modifier>
+    it.filterIsInstance( Modifier::class.java )
   }.distinct()
 
   return listOf(true, false).flatMap { initialized ->
