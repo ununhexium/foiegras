@@ -1,0 +1,14 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ununhexium/dev/kotlin/foiegras/qtcreator/JavaClassReader/main.cpp
+cstdio
+-
+stdlib.h
+-
+

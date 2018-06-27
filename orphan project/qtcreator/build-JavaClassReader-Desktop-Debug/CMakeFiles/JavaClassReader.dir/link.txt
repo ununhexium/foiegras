@@ -1,0 +1,1 @@
+/usr/bin/gcc -g  -rdynamic CMakeFiles/JavaClassReader.dir/main.c.o  -o JavaClassReader 

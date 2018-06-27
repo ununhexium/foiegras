@@ -1,6 +1,14 @@
 plugins {
   id 'java'
   id 'org.jetbrains.kotlin.jvm' version '1.2.50'
+  id 'idea'
+}
+
+idea {
+  module {
+    downloadJavadoc = true
+    downloadSources = true
+  }
 }
 
 group 'net.lab0.foiegras'
@@ -13,10 +21,17 @@ repositories {
 }
 
 dependencies {
-  compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
   compile 'com.squareup:kotlinpoet:0.7.0'
   compile 'com.squareup:javapoet:1.11.1'
   compile 'com.google.guava:guava:25.0-jre'
+  compile 'io.kaitai:kaitai-struct-runtime:0.8'
+  compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+  compile 'org.ow2.asm:asm:6.2'
+  compile 'org.ow2.asm:asm-util:6.2'
+
+  testImplementation "org.assertj:assertj-core:3.10.0"
+  testImplementation "org.junit.jupiter:junit-jupiter-api:5.2.0"
+  testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.2.0"
 }
 
 compileKotlin {

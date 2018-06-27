@@ -1,0 +1,3 @@
+/home/ununhexium/dev/kotlin/foiegras/qtcreator/build-JavaClassReader-Desktop-Debug/CMakeFiles/rebuild_cache.dir
+/home/ununhexium/dev/kotlin/foiegras/qtcreator/build-JavaClassReader-Desktop-Debug/CMakeFiles/JavaClassReader.dir
+/home/ununhexium/dev/kotlin/foiegras/qtcreator/build-JavaClassReader-Desktop-Debug/CMakeFiles/edit_cache.dir
