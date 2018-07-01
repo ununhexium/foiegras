@@ -24,9 +24,9 @@ import javax.lang.model.element.Modifier.VOLATILE
 /*
  * Enable or disable these options to filter which tests to run
  */
-const val flatBench = true
+const val flatBench = false
 const val objectBench = true
-const val classBench = true
+const val classBench = false
 
 // warning, this one can theoretically have an unlimited amount of fields
 const val hierarchyBench = false
@@ -38,7 +38,7 @@ const val fullBench = false
  * Margin of error to find the maximum number of fields.
  * Must be > 0
  */
-const val ACCURACY = 1000
+const val ACCURACY = 1
 
 /**
  * To be faster if your computer isn't dying of heat exhaustion
